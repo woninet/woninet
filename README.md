@@ -2,14 +2,14 @@
 
 [![PyPI version](https://img.shields.io/pypi/v/woninet)](https://pypi.org/project/woninet/)
 [![Python](https://img.shields.io/badge/python-3.12-blue)](https://www.python.org/)
-[![License](https://img.shields.io/pypi/l/woninet)](https://github.com/teymuri-alireza/woninet/blob/main/LICENSE)
+[![License](https://img.shields.io/pypi/l/woninet)](https://github.com/woninet/woninet/blob/main/LICENSE)
 [![Downloads](https://img.shields.io/pypi/dm/woninet)](https://pypi.org/project/woninet/)
 
 A local network monitoring system.
 
 **Woninet** detects network hosts, tracks their availability, and measures latency, packet loss, and jitter. It continuously collects metrics and evaluates configurable alert rules in real time.
 
-![Woninet dashboard](https://raw.githubusercontent.com/teymuri-alireza/woninet/refs/heads/dev/public/img/woninet-dasboard.png)
+![Woninet dashboard](https://raw.githubusercontent.com/woninet/woninet/refs/heads/dev/public/img/woninet-dasboard.png)
 
 ## Table of Contents
 
@@ -285,7 +285,7 @@ The `.env` should be kept in the project's root directory.
 
 ## Usage
 
-See the [usage guide](https://github.com/teymuri-alireza/woninet/blob/main/docs/usage.md) for common ways to run Woninet and how to resolve common issues.
+See the [usage guide](https://github.com/woninet/woninet/blob/main/docs/usage.md) for common ways to run Woninet and how to resolve common issues.
 
 ## Platform Notes
 
@@ -321,11 +321,11 @@ The test suite currently focuses on API behavior and core logic and uses pytest 
 
 ## Documentation
 
-For questions or clarification, see the [documentation](https://github.com/teymuri-alireza/woninet/blob/main/docs/documentation.md).
+For questions or clarification, see the [documentation](https://github.com/woninet/woninet/blob/main/docs/documentation.md).
 
 ## Contributing
 
-Thank you for considering a contribution to Woninet. To help maintain code quality, stability, and a predictable release process, please review the [Contributing Guide](https://github.com/teymuri-alireza/woninet/blob/main/CONTRIBUTING.md) before submitting changes.
+Thank you for considering a contribution to Woninet. To help maintain code quality, stability, and a predictable release process, please review the [Contributing Guide](https://github.com/woninet/woninet/blob/main/CONTRIBUTING.md) before submitting changes.
 
 ## License
 
