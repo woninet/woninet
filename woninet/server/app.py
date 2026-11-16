@@ -15,7 +15,7 @@ from woninet.server.routes.page.alerts import router as alerts_page
 from woninet.server.routes.page.settings import router as settings_page
 from woninet.server.routes.page.about import router as about_page
 from woninet.server.dependencies import get_static_path
-from woninet.main import get_monitor
+from woninet.main import MonitorManager
 from woninet.__init__ import __version__
 
 # Global variables
@@ -27,11 +27,13 @@ CHARTS_DIR.mkdir(parents=True, exist_ok=True)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    monitor = get_monitor()
-    monitor.start()
 
     # Assign the instance of Server
     server = app.state.uvicorn_server
+
+    monitor_manager = MonitorManager()
+    monitor_manager.start()
+    app.state.monitor_manager = monitor_manager
 
     async def watch():
         """
@@ -40,7 +42,7 @@ async def lifespan(app: FastAPI):
         """
         while True:
             await asyncio.sleep(1)
-            if not monitor.is_alive():
+            if not monitor_manager.is_alive():
                 server.should_exit = True
                 return
 
@@ -51,7 +53,8 @@ async def lifespan(app: FastAPI):
     finally:
         # Shutdown
         task.cancel()
-        monitor.stop()
+        await asyncio.gather(task, return_exceptions=True)
+        await asyncio.to_thread(monitor_manager.stop)
 
 
 app = FastAPI(

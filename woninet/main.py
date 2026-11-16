@@ -18,6 +18,70 @@ LOGGING_YAML_PATH = Path(__file__).parent / "logging.yaml"
 REMOTE_PROBE_IP = "8.8.8.8"
 diagnostics = None
 monitor = None
+config_json_path = None
+logger = None
+
+
+class MonitorManager:
+    """Manage the lifecycle of the active network monitor instance."""
+
+    def __init__(self):
+        """
+        Initialize the manager with the configured JSON path and diagnostics state.
+        """
+        global config_json_path
+        global diagnostics
+
+        self.config_path = config_json_path
+        self.diagnostics = diagnostics
+
+    def start(self) -> None:
+        """
+        Start the monitor if no monitor instance is already running.
+        """
+        global monitor
+        if monitor is None:
+            global logger
+            configuration = load_config_json(self.config_path)
+
+            monitor = create_monitor(
+                local_ip=detect_local_ip(logger=logger),
+                target_ip=configuration["target_ip_list"],
+                database_config=configuration["database"],
+                arp_noise_limit=configuration["monitoring"]["arp_noise_limit"],
+                max_thread_workers=configuration["monitoring"]["max_workers"],
+                logger=logger,
+                alert_rules=configuration["alert_rules"],
+                config_file_path=self.config_path,
+                diagnostics=self.diagnostics,
+            )
+            monitor.start()
+
+    def stop(self) -> None:
+        """
+        Stop the current monitor and clear all stored diagnostics.
+        """
+        global monitor
+        global diagnostics
+        if monitor is not None:
+            diagnostics.remove_all()
+            monitor.stop()
+            monitor = None
+
+    def wait(self) -> None:
+        """
+        Block until the running monitor exits or finishes its lifecycle.
+        """
+        global monitor
+        if monitor is not None:
+            monitor.wait()
+
+    def is_alive(self) -> bool:
+        """
+        Return True when a monitor instance exists and is actively running.
+        """
+        global monitor
+        return monitor is not None and monitor.is_alive()
 
 
 def detect_local_ip(logger: logging.Logger) -> str:
@@ -223,6 +287,8 @@ def main() -> None:
     """
     global diagnostics
     global monitor
+    global config_json_path
+    global logger
 
     arguments = args()
 
@@ -233,41 +299,30 @@ def main() -> None:
         return
 
     config_json_path = arguments.config
-    configuration = load_config_json(config_json_path)
 
-    target_ip = configuration["target_ip_list"]
     port = arguments.port
 
     core_logger = configure_logger(arguments=arguments)
+    logger = core_logger
     log_yaml = load_logging_yaml(log_output=arguments.logs)
 
     local_ip = detect_local_ip(logger=core_logger)
     diagnostics = create_diagnostics()
 
+    monitor_manager = MonitorManager()
     try:
         if hasattr(arguments, "func"):
-            core_logger.setLevel(logging.ERROR)
-
-        monitor = create_monitor(
-            local_ip=local_ip,
-            target_ip=target_ip,
-            database_config=configuration["database"],
-            arp_noise_limit=configuration["monitoring"]["arp_noise_limit"],
-            max_thread_workers=configuration["monitoring"]["max_workers"],
-            logger=core_logger,
-            alert_rules=configuration["alert_rules"],
-            config_file_path=arguments.config,
-        )
-
-        if hasattr(arguments, "func"):
+            monitor_manager.start()
             arguments.monitor = monitor
             arguments.func(arguments)
             return
 
         if arguments.cli:
-            core_logger.warning("The CLI interface is deprecated. Run `woninet` to use server mode instead.")
-            monitor.start()
-            monitor.wait()
+            core_logger.warning(
+                "The CLI interface is deprecated. Run `woninet` to use server mode instead."
+            )
+            monitor_manager.start()
+            monitor_manager.wait()
         else:
             run_server(
                 ip=local_ip, port=port, log_yaml=log_yaml, diagnostics=diagnostics
@@ -287,5 +342,5 @@ def main() -> None:
     except Exception as e:
         core_logger.error(e)
     finally:
-        if hasattr(monitor, "stop"):
-            monitor.stop()
+        if monitor_manager is not None:
+            monitor_manager.stop()
