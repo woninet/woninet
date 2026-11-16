@@ -1,6 +1,6 @@
 import asyncio
 from pathlib import Path
-from fastapi import FastAPI, Request, HTTPException, status
+from fastapi import FastAPI, Request, HTTPException, Depends, status
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -9,12 +9,14 @@ from contextlib import asynccontextmanager
 from woninet.server.routes.api.devices import router as devices_api
 from woninet.server.routes.api.stats import router as stats_api
 from woninet.server.routes.api.alerts import router as alerts_api
+from woninet.server.routes.api.health import router as health_api
 from woninet.server.routes.api.settings import router as settings_api
 from woninet.server.routes.page.devices import router as devices_page
 from woninet.server.routes.page.alerts import router as alerts_page
+from woninet.server.routes.page.health import router as health_page
 from woninet.server.routes.page.settings import router as settings_page
 from woninet.server.routes.page.about import router as about_page
-from woninet.server.dependencies import get_static_path
+from woninet.server.dependencies import get_static_path, require_monitor
 from woninet.main import MonitorManager
 from woninet.__init__ import __version__
 
@@ -78,16 +80,18 @@ app.mount("/charts", StaticFiles(directory=CHARTS_DIR), name="charts")
 app.include_router(devices_api)
 app.include_router(stats_api)
 app.include_router(alerts_api)
+app.include_router(health_api)
 app.include_router(settings_api)
 app.include_router(devices_page)
 app.include_router(alerts_page)
+app.include_router(health_page)
 app.include_router(settings_page)
 app.include_router(about_page)
 
 
 # The root path
 @app.get("/", response_class=HTMLResponse)
-def root(request: Request):
+def root(request: Request, monitor=Depends(require_monitor)):
     return templates.TemplateResponse(request=request, name="dashboard.html")
 
 
@@ -102,4 +106,19 @@ def custom_not_found_exception(request: Request, exc: HTTPException):
         name="404.html",
         context={"request": request},
         status_code=status.HTTP_404_NOT_FOUND,
+    )
+
+
+@app.exception_handler(503)
+def custom_service_unavailable_exception(request: Request, exc: HTTPException):
+    if request.url.path.startswith("/api/"):
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={"detail": "Service Unavailable"},
+        )
+    return templates.TemplateResponse(
+        request=request,
+        name="503.html",
+        context={"request": request},
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
     )

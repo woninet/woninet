@@ -1,4 +1,5 @@
 from pathlib import Path
+from fastapi import HTTPException, status
 
 
 def get_static_path() -> tuple[Path, Path]:
@@ -23,3 +24,35 @@ def get_monitor_gracefully():
 
     monitor = get_monitor()
     return monitor
+
+
+def require_monitor():
+    """
+    Ensure the monitoring service is available before continuing.
+
+    Returns:
+        The initialized NetworkMonitorCore instance.
+
+    Raises:
+        HTTPException: If the monitor has been degraded.
+    """
+    monitor = get_monitor_gracefully()
+
+    if not monitor.is_healthy():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Monitor is not initialized.",
+        )
+
+    return monitor
+
+
+def get_diagnostics():
+    """
+    Call `woninet.main.get_diagnostics()` and return the instance of `DiagnosticManager`
+    to prevent circular import error.
+    """
+    from woninet.main import get_diagnostics
+
+    diagnostics = get_diagnostics()
+    return diagnostics
