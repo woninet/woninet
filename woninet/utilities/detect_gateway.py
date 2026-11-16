@@ -1,13 +1,18 @@
 from logging import getLogger
 import platform
 import subprocess
+from woninet.core.diagnostic import DiagnosticManager
 
 core_logger = getLogger("core")
 
 
-def get_default_gateway() -> str:
+def get_default_gateway(diagnostics: DiagnosticManager) -> str:
     """
     Return the system's default IPv4 gateway address.
+
+    Args:
+        diagnostics (DiagnosticManager): Instance of DiagnosticManager to collect utility's
+            issues.
 
     This function detects the current operating system and runs the appropriate
     command to determine the default gateway IP address for IPv4 traffic.
@@ -61,6 +66,14 @@ def get_default_gateway() -> str:
         return gateways[0] if gateways else None
 
     else:
+        diagnostics.add_issue(
+            "utility",
+            "DETECT_GATEWAY_FAILED",
+            f"Detecting gateway on this operating system is not implemented yet. Current system: {system}",
+        )
+        core_logger.warning(
+            f"Detecting gateway on this operating system is not implemented yet. Current system: {system}"
+        )
         raise NotImplementedError(
             f"Other operating systems will be implemented later. Current system: {system}"
         )

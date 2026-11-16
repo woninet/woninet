@@ -12,6 +12,7 @@ from woninet.core.collectors import PingCollector
 from woninet.core.storage import StorageEngine
 from woninet.core.alerts import AlertEngine, AlertRule
 from woninet.core.subnet_enumerator import SubnetEnumerator
+from woninet.core.diagnostic import DiagnosticManager
 from woninet.core.manual_ip_enumerator import ManualIPEnumerator
 from woninet.database.engine import DatabaseEngine
 from woninet.database.tables import AlertEventTable
@@ -64,6 +65,7 @@ class NetworkMonitorCore:
         max_thread_workers: int,
         alert_rules: dict,
         config_file_path: str,
+        diagnostics: DiagnosticManager,
     ) -> None:
         """
         Initialize the monitor core and prepare the persistence layer.
@@ -78,6 +80,8 @@ class NetworkMonitorCore:
             max_thread_workers (int): Maximum number of thread workers used to send ICMP pings.
             alert_rules (dict): Provided alert rules, loaded from config.json.
             config_file_path (str): Path to the config file to load.
+            diagnostics (DiagnosticManager): Instance of DiagnosticManager to collect application's
+                issues.
         """
         self._running: bool = False
         self._thread: threading.Thread | None = None
@@ -85,9 +89,13 @@ class NetworkMonitorCore:
         self._start_uptime = datetime.now()
         self.availability_retention_days: int = 90
         self._last_availability_prune: date | None = None
-
+        self.diagnostics = diagnostics
         self.local_ip: str = local_ip
-        self.default_gateway: str = self.set_default_gateway()
+
+        try:
+            self.default_gateway: str = self.set_default_gateway()
+        except Exception:
+            self.default_gateway = "--"
 
         self.arp_noise_limit: float = arp_noise_limit
         self.max_thread_workers: int = max_thread_workers
@@ -95,22 +103,41 @@ class NetworkMonitorCore:
         self.database_type: str = database_config.get("type")
         self.database_path: str = database_config.get("path")
 
-        # Initialize database
-        self.database_engine = DatabaseEngine(
-            database_type=self.database_type, database_path=self.database_path
-        )
-        self.database_engine.init_db()
-        self._engine = self.database_engine.get_database_engine()
-        self.session_factory = self.database_engine.get_session_factory()
+        try:
+            # Initialize database
+            self.database_engine = DatabaseEngine(
+                database_type=self.database_type,
+                database_path=self.database_path,
+                diagnostics=self.diagnostics,
+            )
+            self.database_engine.init_db()
+            self._engine = self.database_engine.get_database_engine()
+            self.session_factory = self.database_engine.get_session_factory()
+        except Exception:
+            self.diagnostics.add_issue(
+                component="monitor_core",
+                code="DATABASE_FAILED",
+                message="Database initialization failed",
+            )
+            return
 
         core_logger.info(f"Initializing network monitor for {self.local_ip}")
 
         self.subnet_enumerator = SubnetEnumerator()
-        self.manual_ip_enumerator = ManualIPEnumerator()
+        self.manual_ip_enumerator = ManualIPEnumerator(self.diagnostics)
+
         self.storage = StorageEngine(session_factory=self.session_factory)
 
         self._validate_config_file_target_ip_type()
-        self.candidate_devices = self.enumerate_candidate_devices(target_ip)
+        try:
+            self.candidate_devices = self.enumerate_candidate_devices(target_ip)
+        except Exception:
+            self.diagnostics.add_issue(
+                component="monitor_core",
+                code="IP_ENUMERATION_FAILED",
+                message="Enumerating target IP address failed",
+            )
+            return
 
         self.ping_collector = PingCollector()
 
@@ -509,6 +536,11 @@ class NetworkMonitorCore:
             candidate_devices = {}
 
         if not is_device_ip_valid(candidate_devices):
+            self.diagnostics.add_issue(
+                component="configuration",
+                code="INVALID_IP_ADDRESS",
+                message="Provided target IP address in `config.json` is not valid.",
+            )
             raise ValueError("IP address is not valid")
         return candidate_devices
 
@@ -639,4 +671,4 @@ class NetworkMonitorCore:
         A wrapper to set the default gateway using the `get_default_gateway()`
         utility.
         """
-        return get_default_gateway()
+        return get_default_gateway(self.diagnostics)

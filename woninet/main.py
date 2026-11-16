@@ -7,6 +7,7 @@ from yaml import safe_load
 from argparse import Namespace
 from sqlalchemy.exc import OperationalError
 from woninet.core.engine import NetworkMonitorCore
+from woninet.core.diagnostic import DiagnosticManager
 from woninet.utilities.arguments import args
 from woninet.utilities.logger import get_core_logger, TRACE_LEVEL
 from woninet.utilities.create_configuration import create_config_json
@@ -15,6 +16,7 @@ from woninet.exc import DatabaseConnectionFailed
 # Global Variables
 LOGGING_YAML_PATH = Path(__file__).parent / "logging.yaml"
 REMOTE_PROBE_IP = "8.8.8.8"
+diagnostics = None
 monitor = None
 
 
@@ -122,6 +124,7 @@ def create_monitor(
     logger: logging.Logger,
     alert_rules: dict,
     config_file_path: str,
+    diagnostics: DiagnosticManager,
 ) -> NetworkMonitorCore:
     """
     Create an instance of NetworkMonitorCore.
@@ -136,6 +139,8 @@ def create_monitor(
         logger (Logger): Logger used for recording logs
         alert_rules (dict): alert_rules loaded from config.json.
         config_file_path (str): Path to the config file to load.
+        diagnostics (DiagnosticManager): Instance of DiagnosticManager to collect application's
+            issues.
 
     Returns:
         NetworkMonitorCore: Instance of NetworkMonitorCore.
@@ -153,6 +158,7 @@ def create_monitor(
             max_thread_workers=max_thread_workers,
             alert_rules=alert_rules,
             config_file_path=config_file_path,
+            diagnostics=diagnostics,
         )
     return monitor
 
@@ -166,7 +172,33 @@ def get_monitor() -> NetworkMonitorCore:
     return monitor
 
 
-def run_server(ip: str, port: int, log_yaml: dict) -> None:
+def create_diagnostics() -> DiagnosticManager:
+    """
+    Create and cache the global diagnostics manager if it does not exist.
+
+    Returns:
+        DiagnosticManager: The initialized diagnostics manager instance.
+    """
+    global diagnostics
+    if diagnostics is None:
+        diagnostics = DiagnosticManager()
+    return diagnostics
+
+
+def get_diagnostics() -> DiagnosticManager:
+    """
+    Return the global diagnostics manager instance.
+
+    Returns:
+        DiagnosticManager: The active diagnostics manager used throughout the app.
+    """
+    global diagnostics
+    return diagnostics
+
+
+def run_server(
+    ip: str, port: int, log_yaml: dict, diagnostics: DiagnosticManager
+) -> None:
     """
     Initialize and run the uvicorn ASGI server.
 
@@ -180,6 +212,7 @@ def run_server(ip: str, port: int, log_yaml: dict) -> None:
     config = uvicorn.Config(app, host=ip, port=port, log_config=log_yaml)
     server = uvicorn.Server(config)
     app.state.uvicorn_server = server
+    app.state.diagnostics = diagnostics
     server.run()
 
 
@@ -188,6 +221,7 @@ def main() -> None:
     Entry point for woninet. Launch either the web dashboard or the CLI
     monitor based on command-line arguments.
     """
+    global diagnostics
     global monitor
 
     arguments = args()
@@ -208,6 +242,7 @@ def main() -> None:
     log_yaml = load_logging_yaml(log_output=arguments.logs)
 
     local_ip = detect_local_ip(logger=core_logger)
+    diagnostics = create_diagnostics()
 
     try:
         if hasattr(arguments, "func"):
@@ -234,7 +269,9 @@ def main() -> None:
             monitor.start()
             monitor.wait()
         else:
-            run_server(ip=local_ip, port=port, log_yaml=log_yaml)
+            run_server(
+                ip=local_ip, port=port, log_yaml=log_yaml, diagnostics=diagnostics
+            )
     except KeyboardInterrupt:
         core_logger.info("Keyboard interrupted. Wait for shut down...")
     except ValueError as e:
