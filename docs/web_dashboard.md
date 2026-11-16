@@ -25,11 +25,15 @@ RESTful endpoints.
 This object defines and manages the following routes:
 
 - `/api/devices`
+- `/devices`
 - `/api/stats`
 - `/api/alerts`
 - `/alerts`
 - `/api/settings`
 - `/settings`
+- `/api/health`
+- `/api/health/restart`
+- `/health`
 - `/about`
 - `/ (root dashboard interface)`
 
@@ -38,11 +42,11 @@ for viewing devices and network health.
 
 ### Application Lifecycle Management
 
-The FastAPI application manages the lifecycle of the shared `NetworkMonitorCore` instance
-using the `lifespan()` context manager
+The FastAPI application manages the lifecycle of the `MonitorManager` instance using the `lifespan()` context manager.
 
-By centralizing monitor lifecycle control within `lifespan()`, the application guarantees
-consistent state management across all API routes.
+During application startup, `lifespan()` initializes the `MonitorManager`, which is responsible for creating and managing the shared `NetworkMonitorCore` instance. This allows the monitoring service to operate independently of the web server's lifecycle while remaining accessible to API routes.
+
+By centralizing monitor initialization and lifecycle management within `lifespan()`, the application ensures consistent state management and provides a centralized mechanism for handling initialization failures and shutdown procedures.
 
 ## 3. Route Overview
 
@@ -54,8 +58,6 @@ The `/api/devices` route invokes `list_devices()`, which calls the **device serv
 
 Internally:
 
-- The `device_service` module uses `get_monitor_gracefully()` to obtain an instance of
-`NetworkMonitorCore` while avoiding circular import issues.
 - The `monitor`'s `get_device_history()` method is invoked to collect a list of discovered devices.
 - Discovered devices are returned as a structured JSON list to the dashboard.
 
@@ -127,6 +129,44 @@ The `/api/alerts` route calls `monitor.classify_recent_alert_events()` which ret
   ]
 }
 ```
+### /api/health - Application Health
+
+The `/api/health` route returns the current health status of the application, including the monitoring service and its components.
+
+This endpoint uses the application's diagnostic information to report initialization issues and the current operational state.
+
+**Example Response:**
+
+```json
+{
+  "health": {
+    "monitor_core": {
+      "error_code": "DATABASE_FAILED",
+      "message": "Database initialization failed"
+    },
+    "database": {
+      "error_code": "DATABASE_CONFIG_FAILED",
+      "message": "Cannot validate the database parameters form `config.json`."
+    },
+    "configuration": {
+      "error_code": "CONFIG_KEY_MISSING",
+      "message": "Missing required key 'type' under 'database' in 'config.json'."
+    },
+    "utility": {
+      "error_code": null,
+      "message": null
+    }
+  }
+}
+```
+
+### /api/health/restart - Restart Monitoring Service
+
+The `/api/health/restart` route attempts to restart the monitoring service using the current application configuration.
+
+This endpoint is intended to recover the monitoring service after configuration issues have been resolved, without restarting the entire application.
+
+This route will redirect user to the `/health` endpoint.
 
 ### /api/settings - Configuration Settings
 

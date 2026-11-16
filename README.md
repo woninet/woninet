@@ -33,7 +33,7 @@ A local network monitoring system.
 - **Threaded collectors.** Sends ICMP probes concurrently using a configurable number of worker threads.
 - **Custom SQL database (PostgreSQL, SQLite).** Persists devices, recorded metrics, alert states, and alert events.
 - **Database access from the CLI.** Accepts a positional argument for easier access to the database.
-- **Detailed logging.**
+- **Diagnostics Manager.** Preserves, Collects, and handle application's issues and send them to user to resolve.
 
 ## Requirements
 
