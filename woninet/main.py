@@ -331,8 +331,6 @@ def main() -> None:
         core_logger.info("Keyboard interrupted. Wait for shut down...")
     except ValueError as e:
         core_logger.error(f"{e} Quitting.")
-    except FileNotFoundError:
-        core_logger.error("Can not find the config.json file. Quitting.")
     except NameError as e:
         core_logger.error(e)
     except OperationalError as e:
