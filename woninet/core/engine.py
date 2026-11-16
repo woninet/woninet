@@ -1,5 +1,4 @@
 import json
-import time
 import logging
 import threading
 from datetime import date, datetime, timedelta, time as dt_time
@@ -87,6 +86,7 @@ class NetworkMonitorCore:
         self._thread: threading.Thread | None = None
         self._stop_event: threading.Event = threading.Event()
         self._start_uptime = datetime.now()
+        self._status: Literal["healthy", "degraded"] = "healthy"
         self.availability_retention_days: int = 90
         self._last_availability_prune: date | None = None
         self.diagnostics = diagnostics
@@ -119,6 +119,7 @@ class NetworkMonitorCore:
                 code="DATABASE_FAILED",
                 message="Database initialization failed",
             )
+            self.set_status("degraded")
             return
 
         core_logger.info(f"Initializing network monitor for {self.local_ip}")
@@ -137,6 +138,7 @@ class NetworkMonitorCore:
                 code="IP_ENUMERATION_FAILED",
                 message="Enumerating target IP address failed",
             )
+            self.set_status("degraded")
             return
 
         self.ping_collector = PingCollector()
@@ -200,7 +202,7 @@ class NetworkMonitorCore:
                 cycle_started = datetime.now()
                 cycle_checks: list[tuple[str, bool]] = []
 
-                if self.candidate_devices != {}:
+                if self.candidate_devices != {} and self.is_healthy():
                     for result in self.ping_collector.collect(
                         candidate_devices=self.candidate_devices,
                         local_ip=self.local_ip,
@@ -242,32 +244,45 @@ class NetworkMonitorCore:
                             pass
                     self.record_availability(cycle_checks, cycle_started)
                     self.clean_up_database()
-                time.sleep(1)
+                self._stop_event.wait(1)
         except (PermissionError, SocketPermissionError):
             core_logger.error("woninet requires root privileges to scan.")
-            self._running = False
-            self._stop_event.set()
         except SocketAddressError:
             core_logger.error("Network connection failed. Quitting.")
-            self._running = False
-            self._stop_event.set()
         except PingUtilityNotFound:
             core_logger.error("Couldn't find the ping command on PATH. Quitting.")
-            self._running = False
-            self._stop_event.set()
         except Exception as e:
             core_logger.error(f"Unexpected error in NetworkMonitorCore: {e}")
-            self._running = False
-            self._stop_event.set()
         finally:
-            self._running = False
-            self._stop_event.set()
+            self.set_status("degraded")
 
     def is_alive(self) -> bool:
         """
         Return the running state of monitor.
         """
         return self._running
+
+    def is_healthy(self) -> bool:
+        """
+        Return the monitor status (`healthy`, `degraded`).
+        """
+        return self._status == "healthy"
+
+    def set_status(self, status: Literal["healthy", "degraded"]) -> None:
+        """
+        Set the monitor status (`healthy`, `degraded`).
+
+        Args:
+            status: The monitor's current status
+
+        Raises:
+            ValueError: When the given status is not accepted (
+                `healthy`, `degraded`).
+        """
+        if status not in ["healthy", "degraded"]:
+            raise ValueError("Status value can be `healthy` or `degraded`.")
+
+        self._status = status
 
     def get_device_history(self) -> list[Device]:
         """
