@@ -1,10 +1,21 @@
 from woninet.core.models import Device
+from woninet.core.diagnostic import DiagnosticManager
 
 
 class ManualIPEnumerator:
     """
     Build a dictionary of candidate devices for user-provided IP addresses.
     """
+
+    def __init__(self, diagnostics: DiagnosticManager) -> None:
+        """
+        Initialize the manual IP enumerator with the diagnostics instance collect issues.
+
+        Args:
+            diagnostics (DiagnosticManager): Instance of DiagnosticManager to collect utility's
+                issues.
+        """
+        self.diagnostics = diagnostics
 
     def enumerate(self, ip_list: list[str]) -> dict[str, str]:
         devices = {}
@@ -24,6 +35,11 @@ class ManualIPEnumerator:
         """
         base, last_octet = ip_range.rsplit(".", maxsplit=1)
         if "-" in base:
+            self.diagnostics.add_issue(
+                "configuration",
+                "INVALID_IP_RANGE_FORMAT",
+                "Range enumeration is only supported on the last octet. check `target_ip_list` key in `config.json`.",
+            )
             raise ValueError("Range enumeration is only supported on the last octet.")
         start, stop = last_octet.split("-")
         devices = {}

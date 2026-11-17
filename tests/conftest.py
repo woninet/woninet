@@ -1,14 +1,12 @@
 import pytest
+import copy
 from datetime import datetime
 from fastapi.testclient import TestClient
 from woninet.server.app import app
-import woninet.server.routes.api.devices as devices_route
-import woninet.server.routes.page.devices as device_page_route
-import woninet.server.routes.api.stats as stats_route
-import woninet.server.routes.api.settings as settings_route
-import woninet.server.routes.api.alerts as alerts_route
+from woninet.core.diagnostic import DiagnosticManager
 from woninet.database.engine import DatabaseEngine
 from woninet.database.tables import DeviceTable
+from woninet.server.dependencies import require_monitor
 
 _start_uptime = datetime.now()
 
@@ -50,10 +48,14 @@ TEST_CONFIG = {
     "target_ip_list": "192.168.1.1-100,192.168.1.110",
 }
 
+diagnostics = DiagnosticManager()
+
 
 @pytest.fixture
 def db_session():
-    db_engine = DatabaseEngine(database_type="sqlite", database_path=":memory:")
+    db_engine = DatabaseEngine(
+        database_type="sqlite", database_path=":memory:", diagnostics=diagnostics
+    )
     db_engine.init_db()
 
     session_factory = db_engine.get_session_factory()
@@ -80,10 +82,10 @@ class FakeMonitor:
         storage: FakeStorage | None = None,
     ):
         self.storage = storage if storage is not None else FakeStorage()
-        self.devices = devices
+        self.devices = devices if devices is not None else list(TEST_DEVICES)
         self.local_ip = "192.168.200.100"
         self.default_gateway = "192.168.200.1"
-        self.config: dict = TEST_CONFIG
+        self.config: dict = copy.deepcopy(TEST_CONFIG)
         self.database_type: str = "sqlite"
         self.config_updates: list[dict] = []
         self.alert_events: list[dict] = list(TEST_ALERT_EVENTS)
@@ -166,37 +168,8 @@ def fake_monitor(fake_storage):
 
 @pytest.fixture
 def client(monkeypatch, fake_monitor):
-    def fake_get_monitor_gracefully():
-        return fake_monitor
-
-    monkeypatch.setattr(
-        devices_route,
-        "get_monitor_gracefully",
-        fake_get_monitor_gracefully,
-    )
-
-    monkeypatch.setattr(
-        device_page_route,
-        "get_monitor_gracefully",
-        fake_get_monitor_gracefully,
-    )
-
-    monkeypatch.setattr(
-        stats_route,
-        "get_monitor_gracefully",
-        fake_get_monitor_gracefully,
-    )
-
-    monkeypatch.setattr(
-        settings_route,
-        "get_monitor_gracefully",
-        fake_get_monitor_gracefully,
-    )
-
-    monkeypatch.setattr(
-        alerts_route,
-        "get_monitor_gracefully",
-        fake_get_monitor_gracefully,
-    )
-
-    return TestClient(app)
+    app.dependency_overrides[require_monitor] = lambda: fake_monitor
+    try:
+        yield TestClient(app)
+    finally:
+        app.dependency_overrides.clear()

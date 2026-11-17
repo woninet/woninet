@@ -1,15 +1,14 @@
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
-from woninet.server.dependencies import get_monitor_gracefully
+from woninet.server.dependencies import require_monitor
 
 router = APIRouter(prefix="/api/stats", tags=["stats"])
 
 
 @router.get("")
-def stats():
+def stats(monitor=Depends(require_monitor)):
     from woninet.__init__ import __version__
 
-    monitor = get_monitor_gracefully()
     devices_total, metrics_total = monitor.count_resources()
 
     return JSONResponse(

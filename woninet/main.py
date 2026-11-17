@@ -2,11 +2,13 @@ import socket
 import logging
 import uvicorn
 import json
+import threading
 from pathlib import Path
 from yaml import safe_load
 from argparse import Namespace
 from sqlalchemy.exc import OperationalError
 from woninet.core.engine import NetworkMonitorCore
+from woninet.core.diagnostic import DiagnosticManager
 from woninet.utilities.arguments import args
 from woninet.utilities.logger import get_core_logger, TRACE_LEVEL
 from woninet.utilities.create_configuration import create_config_json
@@ -15,7 +17,101 @@ from woninet.exc import DatabaseConnectionFailed
 # Global Variables
 LOGGING_YAML_PATH = Path(__file__).parent / "logging.yaml"
 REMOTE_PROBE_IP = "8.8.8.8"
+diagnostics = None
 monitor = None
+config_json_path = None
+logger = None
+
+
+class MonitorManager:
+    """Manage the lifecycle of the active network monitor instance."""
+
+    def __init__(self):
+        """
+        Initialize the manager with the configured JSON path and diagnostics state.
+        """
+        global config_json_path
+        global diagnostics
+
+        self.config_path = config_json_path
+        self.diagnostics = diagnostics
+        self._lock = threading.RLock()
+        self._restarting = False
+
+    def start(self) -> None:
+        """
+        Start the network monitor if one is not already running.
+        """
+        with self._lock:
+            self._start_locked()
+
+    def stop(self) -> None:
+        """
+        Stop the active monitor and clear diagnostics state.
+        """
+        with self._lock:
+            self._stop_locked()
+
+    def restart(self) -> None:
+        """
+        Stop and start the monitor as one atomic operation. While it runs,
+        is_alive() reports True so the watchdog does not trigger a shutdown.
+        """
+        with self._lock:
+            self._restarting = True
+            try:
+                self._stop_locked()
+                self._start_locked()
+            finally:
+                self._restarting = False
+
+    def is_alive(self) -> bool:
+        """
+        Return whether the current monitor instance is running.
+
+        Intentionally lock-free: this is called from the asyncio event loop
+        and must never block while restart() holds the lock.
+        """
+        if self._restarting:
+            return True
+        current = monitor
+        return current is not None and current.is_alive()
+
+    def wait(self) -> None:
+        """Block until the active monitor thread exits."""
+        current = monitor
+        if current is not None:
+            current.wait()
+
+    def _start_locked(self) -> None:
+        """
+        Create and start the monitor while holding the manager lock.
+        """
+        global monitor
+        if monitor is None:
+            configuration = load_config_json(self.config_path)
+            monitor = create_monitor(
+                local_ip=detect_local_ip(logger=logger),
+                target_ip=configuration["target_ip_list"],
+                database_config=configuration["database"],
+                arp_noise_limit=configuration["monitoring"]["arp_noise_limit"],
+                max_thread_workers=configuration["monitoring"]["max_workers"],
+                logger=logger,
+                alert_rules=configuration["alert_rules"],
+                config_file_path=self.config_path,
+                diagnostics=self.diagnostics,
+            )
+            monitor.start()
+
+    def _stop_locked(self) -> None:
+        """
+        Stop the active monitor and reset the global monitor reference.
+        """
+        global monitor
+        if monitor is not None:
+            monitor.stop()
+            self.diagnostics.remove_all()
+            monitor = None
 
 
 def detect_local_ip(logger: logging.Logger) -> str:
@@ -122,6 +218,7 @@ def create_monitor(
     logger: logging.Logger,
     alert_rules: dict,
     config_file_path: str,
+    diagnostics: DiagnosticManager,
 ) -> NetworkMonitorCore:
     """
     Create an instance of NetworkMonitorCore.
@@ -136,6 +233,8 @@ def create_monitor(
         logger (Logger): Logger used for recording logs
         alert_rules (dict): alert_rules loaded from config.json.
         config_file_path (str): Path to the config file to load.
+        diagnostics (DiagnosticManager): Instance of DiagnosticManager to collect application's
+            issues.
 
     Returns:
         NetworkMonitorCore: Instance of NetworkMonitorCore.
@@ -153,6 +252,7 @@ def create_monitor(
             max_thread_workers=max_thread_workers,
             alert_rules=alert_rules,
             config_file_path=config_file_path,
+            diagnostics=diagnostics,
         )
     return monitor
 
@@ -166,7 +266,33 @@ def get_monitor() -> NetworkMonitorCore:
     return monitor
 
 
-def run_server(ip: str, port: int, log_yaml: dict) -> None:
+def create_diagnostics() -> DiagnosticManager:
+    """
+    Create and cache the global diagnostics manager if it does not exist.
+
+    Returns:
+        DiagnosticManager: The initialized diagnostics manager instance.
+    """
+    global diagnostics
+    if diagnostics is None:
+        diagnostics = DiagnosticManager()
+    return diagnostics
+
+
+def get_diagnostics() -> DiagnosticManager:
+    """
+    Return the global diagnostics manager instance.
+
+    Returns:
+        DiagnosticManager: The active diagnostics manager used throughout the app.
+    """
+    global diagnostics
+    return diagnostics
+
+
+def run_server(
+    ip: str, port: int, log_yaml: dict, diagnostics: DiagnosticManager
+) -> None:
     """
     Initialize and run the uvicorn ASGI server.
 
@@ -180,6 +306,7 @@ def run_server(ip: str, port: int, log_yaml: dict) -> None:
     config = uvicorn.Config(app, host=ip, port=port, log_config=log_yaml)
     server = uvicorn.Server(config)
     app.state.uvicorn_server = server
+    app.state.diagnostics = diagnostics
     server.run()
 
 
@@ -188,7 +315,10 @@ def main() -> None:
     Entry point for woninet. Launch either the web dashboard or the CLI
     monitor based on command-line arguments.
     """
+    global diagnostics
     global monitor
+    global config_json_path
+    global logger
 
     arguments = args()
 
@@ -199,48 +329,38 @@ def main() -> None:
         return
 
     config_json_path = arguments.config
-    configuration = load_config_json(config_json_path)
 
-    target_ip = configuration["target_ip_list"]
     port = arguments.port
 
     core_logger = configure_logger(arguments=arguments)
+    logger = core_logger
     log_yaml = load_logging_yaml(log_output=arguments.logs)
 
     local_ip = detect_local_ip(logger=core_logger)
+    diagnostics = create_diagnostics()
 
+    monitor_manager = MonitorManager()
     try:
         if hasattr(arguments, "func"):
-            core_logger.setLevel(logging.ERROR)
-
-        monitor = create_monitor(
-            local_ip=local_ip,
-            target_ip=target_ip,
-            database_config=configuration["database"],
-            arp_noise_limit=configuration["monitoring"]["arp_noise_limit"],
-            max_thread_workers=configuration["monitoring"]["max_workers"],
-            logger=core_logger,
-            alert_rules=configuration["alert_rules"],
-            config_file_path=arguments.config,
-        )
-
-        if hasattr(arguments, "func"):
+            monitor_manager.start()
             arguments.monitor = monitor
             arguments.func(arguments)
             return
 
         if arguments.cli:
-            core_logger.warning("The CLI interface is deprecated. Run `woninet` to use server mode instead.")
-            monitor.start()
-            monitor.wait()
+            core_logger.warning(
+                "The CLI interface is deprecated. Run `woninet` to use server mode instead."
+            )
+            monitor_manager.start()
+            monitor_manager.wait()
         else:
-            run_server(ip=local_ip, port=port, log_yaml=log_yaml)
+            run_server(
+                ip=local_ip, port=port, log_yaml=log_yaml, diagnostics=diagnostics
+            )
     except KeyboardInterrupt:
         core_logger.info("Keyboard interrupted. Wait for shut down...")
     except ValueError as e:
         core_logger.error(f"{e} Quitting.")
-    except FileNotFoundError:
-        core_logger.error("Can not find the config.json file. Quitting.")
     except NameError as e:
         core_logger.error(e)
     except OperationalError as e:
@@ -250,5 +370,5 @@ def main() -> None:
     except Exception as e:
         core_logger.error(e)
     finally:
-        if hasattr(monitor, "stop"):
-            monitor.stop()
+        if monitor_manager is not None:
+            monitor_manager.stop()
