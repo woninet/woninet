@@ -18,6 +18,6 @@ def about(request: Request):
         name="about.html",
         context={
             "version": __version__,
-            "github_url": "https://github.com/teymuri-alireza/woninet",
+            "github_url": "https://github.com/woninet/woninet",
         },
     )

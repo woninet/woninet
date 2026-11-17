@@ -125,7 +125,7 @@ To open Woninet manually, type device's private IP address with the default `808
 1. Clone the repository:
 
     ```shell
-    git clone https://github.com/teymuri-alireza/woninet
+    git clone https://github.com/woninet/woninet
     cd woninet
     ```
 

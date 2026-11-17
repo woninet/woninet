@@ -140,4 +140,4 @@ woninet -p 9090
 ---
 
 If you encounter additional issues, feel free to open an issue on the
-[woninet](https://github.com/teymuri-alireza/woninet) GitHub repository.
+[woninet](https://github.com/woninet/woninet) GitHub repository.
