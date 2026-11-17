@@ -18,6 +18,7 @@ def about(request: Request):
         name="about.html",
         context={
             "version": __version__,
+            "website": "https://woninet.github.io",
             "github_url": "https://github.com/woninet/woninet",
         },
     )
