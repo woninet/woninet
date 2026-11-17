@@ -44,7 +44,6 @@ def health():
 @router.get("/restart")
 def restart(request: Request):
     monitor_manager = request.app.state.monitor_manager
-    monitor_manager.stop()
-    monitor_manager.start()
+    monitor_manager.restart()
 
     return RedirectResponse(url="/health", status_code=status.HTTP_303_SEE_OTHER)

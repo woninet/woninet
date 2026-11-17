@@ -2,6 +2,7 @@ import socket
 import logging
 import uvicorn
 import json
+import threading
 from pathlib import Path
 from yaml import safe_load
 from argparse import Namespace
@@ -34,16 +35,61 @@ class MonitorManager:
 
         self.config_path = config_json_path
         self.diagnostics = diagnostics
+        self._lock = threading.RLock()
+        self._restarting = False
 
     def start(self) -> None:
         """
-        Start the monitor if no monitor instance is already running.
+        Start the network monitor if one is not already running.
+        """
+        with self._lock:
+            self._start_locked()
+
+    def stop(self) -> None:
+        """
+        Stop the active monitor and clear diagnostics state.
+        """
+        with self._lock:
+            self._stop_locked()
+
+    def restart(self) -> None:
+        """
+        Stop and start the monitor as one atomic operation. While it runs,
+        is_alive() reports True so the watchdog does not trigger a shutdown.
+        """
+        with self._lock:
+            self._restarting = True
+            try:
+                self._stop_locked()
+                self._start_locked()
+            finally:
+                self._restarting = False
+
+    def is_alive(self) -> bool:
+        """
+        Return whether the current monitor instance is running.
+
+        Intentionally lock-free: this is called from the asyncio event loop
+        and must never block while restart() holds the lock.
+        """
+        if self._restarting:
+            return True
+        current = monitor
+        return current is not None and current.is_alive()
+
+    def wait(self) -> None:
+        """Block until the active monitor thread exits."""
+        current = monitor
+        if current is not None:
+            current.wait()
+
+    def _start_locked(self) -> None:
+        """
+        Create and start the monitor while holding the manager lock.
         """
         global monitor
         if monitor is None:
-            global logger
             configuration = load_config_json(self.config_path)
-
             monitor = create_monitor(
                 local_ip=detect_local_ip(logger=logger),
                 target_ip=configuration["target_ip_list"],
@@ -57,31 +103,15 @@ class MonitorManager:
             )
             monitor.start()
 
-    def stop(self) -> None:
+    def _stop_locked(self) -> None:
         """
-        Stop the current monitor and clear all stored diagnostics.
+        Stop the active monitor and reset the global monitor reference.
         """
         global monitor
-        global diagnostics
         if monitor is not None:
-            diagnostics.remove_all()
             monitor.stop()
+            self.diagnostics.remove_all()
             monitor = None
-
-    def wait(self) -> None:
-        """
-        Block until the running monitor exits or finishes its lifecycle.
-        """
-        global monitor
-        if monitor is not None:
-            monitor.wait()
-
-    def is_alive(self) -> bool:
-        """
-        Return True when a monitor instance exists and is actively running.
-        """
-        global monitor
-        return monitor is not None and monitor.is_alive()
 
 
 def detect_local_ip(logger: logging.Logger) -> str:
