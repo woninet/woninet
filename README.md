@@ -9,7 +9,7 @@ A local network monitoring system.
 
 **Woninet** detects network hosts, tracks their availability, and measures latency, packet loss, and jitter. It continuously collects metrics and evaluates configurable alert rules in real time.
 
-![Woninet dashboard](https://raw.githubusercontent.com/woninet/woninet/refs/heads/dev/public/img/woninet-dasboard.png)
+![Woninet dashboard](https://raw.githubusercontent.com/woninet/woninet/refs/heads/dev/public/img/woninet-dashboard.png)
 
 ## Table of Contents
 
