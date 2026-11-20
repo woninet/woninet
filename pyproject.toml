@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "woninet"
-version = "2.2.0"
+version = "2.3.0"
 description = "A Python-based ARP+ICMP network monitoring tool"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -30,6 +30,8 @@ dependencies = [
     "SQLAlchemy>=2.0.46,<2.1",
     "python-multipart==0.0.32",
     "fastapi-swagger>=0.4.64,<0.5",
+    "psycopg[binary]>=3.3.8,<3.4",
+    "pydantic-settings>=2.16.2,<2.17",
 ]
 
 [tool.setuptools.packages.find]
@@ -43,11 +45,11 @@ woninet = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/teymuri-alireza/woninet"
-Documentation = "https://github.com/teymuri-alireza/woninet/tree/main/docs"
-Repository = "https://github.com/teymuri-alireza/woninet"
-Issues = "https://github.com/teymuri-alireza/woninet/issues"
-Changelog = "https://github.com/teymuri-alireza/woninet/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/woninet/woninet"
+Documentation = "https://github.com/woninet/woninet/tree/main/docs"
+Repository = "https://github.com/woninet/woninet"
+Issues = "https://github.com/woninet/woninet/issues"
+Changelog = "https://github.com/woninet/woninet/blob/main/CHANGELOG.md"
 
 [project.scripts]
 woninet = "woninet.main:main"
@@ -55,6 +57,6 @@ woninet = "woninet.main:main"
 [project.optional-dependencies]
 test = [
     "pytest>=9.1.1,<9.2",
-    "httpx>=0.28.1,<0.29",
+    "httpx2>=2.16.0,<2.17",
     "ruff>=0.15.11,<0.16",
 ]

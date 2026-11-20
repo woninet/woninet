@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>woninet Health</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/health.css">
+    <link rel="shortcut icon" href="/static/img/favicon.ico" type="image/x-icon">
+</head>
+<body>
+    <div class="app">
+
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+            <div class="brand">
+                <i class="fa-solid fa-network-wired"></i>
+                <span>woninet</span>
+            </div>
+
+            <nav class="nav">
+                <p class="nav-label">Menu</p>
+                <a class="nav-link" href="/">
+                    <i class="fa-solid fa-server"></i>
+                    <span>Devices</span>
+                </a>
+                <a class="nav-link" href="/alerts">
+                    <i class="fa-solid fa-bell"></i>
+                    <span>Alerts</span>
+                </a>
+                <a class="nav-link active" href="/health">
+                    <i class="fa-solid fa-heart-pulse"></i>
+                    <span>Health</span>
+                </a>
+                <a class="nav-link" href="/settings">
+                    <i class="fa-solid fa-gear"></i>
+                    <span>Settings</span>
+                </a>
+                <a class="nav-link" href="/about">
+                    <i class="fa-solid fa-circle-info"></i>
+                    <span>About</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="api-status">
+                    <span id="status_dot" class="status-dot"></span>
+                    <span id="status_text">Connected</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <div class="content">
+            <header class="topbar">
+                <div>
+                    <p class="eyebrow">System Status</p>
+                    <h1>Health</h1>
+                    <p class="subtitle">Operational status of the monitoring service components</p>
+                    <p class="subtitle"><strong>Note: If you encountered an issue, resolve it and then click "Restart Application".</strong></p>
+                </div>
+                <div class="health-actions">
+                    <span id="last_checked" class="last-checked">Last checked: —</span>
+                    <div>
+                        <button id="refresh_btn" type="button" class="refresh-btn">
+                            <i class="fa-solid fa-rotate"></i>
+                            <span>Refresh</span>
+                        </button>
+                        <button id="restart_btn" type="button" class="refresh-btn">
+                            <i class="fa-solid fa-rotate"></i>
+                            <span>Restart Application</span>
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- OVERALL STATUS -->
+            <section id="overall" class="overall unknown">
+                <div class="overall-icon"><i class="fa-solid fa-circle-notch fa-spin"></i></div>
+                <div>
+                    <h2 id="overall_title">Checking system health…</h2>
+                    <p id="overall_text">Please wait while the latest status is retrieved.</p>
+                </div>
+            </section>
+
+            <!-- COMPONENT CARDS -->
+            <section id="health_cards" class="health-grid">
+                <div class="loader"></div>
+            </section>
+        </div>
+    </div>
+
+    <script src="/static/js/health.js"></script>
+</body>
+</html>

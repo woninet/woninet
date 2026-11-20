@@ -2,14 +2,14 @@
 
 [![PyPI version](https://img.shields.io/pypi/v/woninet)](https://pypi.org/project/woninet/)
 [![Python](https://img.shields.io/badge/python-3.12-blue)](https://www.python.org/)
-[![License](https://img.shields.io/pypi/l/woninet)](https://github.com/teymuri-alireza/woninet/blob/main/LICENSE)
+[![License](https://img.shields.io/pypi/l/woninet)](https://github.com/woninet/woninet/blob/main/LICENSE)
 [![Downloads](https://img.shields.io/pypi/dm/woninet)](https://pypi.org/project/woninet/)
 
 A local network monitoring system.
 
-**Woninet** continuously monitors devices on a local network using ARP and ICMP probes. It enumerates candidate IP addresses in a /24 subnet, determines device availability, measures latency, packet loss, and jitter, stores metrics in database, and evaluates configurable alert rules in real time.
+**Woninet** detects network hosts, tracks their availability, and measures latency, packet loss, and jitter. It continuously collects metrics and evaluates configurable alert rules in real time.
 
-![Woninet dashboard](https://github.com/teymuri-alireza/woninet/blob/dev/public/img/woninet-dasboard.png)
+![Woninet dashboard](https://raw.githubusercontent.com/woninet/woninet/refs/heads/dev/public/img/woninet-dashboard.png)
 
 ## Table of Contents
 
@@ -31,9 +31,9 @@ A local network monitoring system.
 - **ARP + ICMP host detection.** Distinguishes real devices from nonexistent IP addresses and filters out Wi-Fi ARP-delay noise.
 - **Alert engine.** Evaluates real-time alert rules, such as latency thresholds, against collected metrics.
 - **Threaded collectors.** Sends ICMP probes concurrently using a configurable number of worker threads.
-- **SQLite storage.** Persists devices, recorded metrics, alert states, and alert events.
+- **Custom SQL database (PostgreSQL, SQLite).** Persists devices, recorded metrics, alert states, and alert events.
 - **Database access from the CLI.** Accepts a positional argument for easier access to the database.
-- **Detailed logging.**
+- **Diagnostics Manager.** Preserves, Collects, and handle application's issues and send them to user to resolve.
 
 ## Requirements
 
@@ -125,7 +125,7 @@ To open Woninet manually, type device's private IP address with the default `808
 1. Clone the repository:
 
     ```shell
-    git clone https://github.com/teymuri-alireza/woninet
+    git clone https://github.com/woninet/woninet
     cd woninet
     ```
 
@@ -184,7 +184,10 @@ To use a different configuration file, pass its path with the `--config` CLI fla
         "arp_noise_limit": 300.0,
         "max_workers": 4
     },
-    "database": "woninet.db",
+    "database": {
+        "type": "sqlite",
+        "path": "woninet.db"
+    },
     "target_ip_list": [
         "192.168.1.1", "192.168.1.10", "192.168.1.20-30"
     ],
@@ -221,13 +224,50 @@ To use a different configuration file, pass its path with the `--config` CLI fla
 
 | Key | Description |
 |---|---|
-| `database` | Path to the SQLite database file where metrics and alerts are stored. |
+| `database.type` | The database backend: `sqlite` or `postgresql`. |
+| `database.path` | The database location. For `sqlite`, this is the path to the database file. For `postgresql`, this is a connection URL (see below). |
+
+For PostgreSQL, set `type` to `postgresql` and provide the connection URL as `path`:
+
+```json
+"database": {
+    "type": "postgresql",
+    "path": "postgresql+psycopg://user:password@localhost:5432/woninet_db"
+}
+```
+
+The URL format is `postgresql+psycopg://<username>:<password>@<host>:<port>/<database>`. If the password contains special characters (such as `@`, `:` or `/`), percent-encode them.
+
+**Note: For the PostgreSQL database, it's recommended to provide the path through `.env`**
+
+A connection URL contains credentials, so storing it in `config.json` is discouraged. Instead, define the `WONINET_DATABASE_URL` variable in a `.env` file. When set, it **overrides** `database.path` in `config.json`:
+
+```shell
+WONINET_DATABASE_URL=postgresql+psycopg://user:password@localhost:5432/woninet
+```
+
+In this case, `config.json` only needs the backend type:
+
+```json
+"database": {
+    "type": "postgresql"
+}
+```
+
+The precedence order is:
+
+1. `WONINET_DATABASE_URL` (`.env` file)
+2. `database.path` in `config.json`
+
+The `.env` file is optional. SQLite users can set `path` directly in `config.json`.
+
+The `.env` should be kept in the project's root directory.
 
 #### Target IP list
 
 | Key | Description |
 |---|---|
-| `target_ip_list` | A single address, a list of addresses, or a range (for example `192.168.1.1-100`) to scan. Monitoring is currently limited to a /24 subnet (see [Known Issues](#known-issues)). |
+| `target_ip_list` | A single address, a list of addresses, or a range (for example `192.168.1.1-100`) to scan. An empty list indicates that no scan cycle will run. Monitoring is currently limited to a /24 subnet (see [Known Issues](#known-issues)). |
 
 #### Alert rules
 
@@ -245,7 +285,7 @@ To use a different configuration file, pass its path with the `--config` CLI fla
 
 ## Usage
 
-See the [usage guide](https://github.com/teymuri-alireza/woninet/blob/main/docs/usage.md) for common ways to run Woninet and how to resolve common issues.
+See the [usage guide](https://github.com/woninet/woninet/blob/main/docs/usage.md) for common ways to run Woninet and how to resolve common issues.
 
 ## Platform Notes
 
@@ -281,11 +321,11 @@ The test suite currently focuses on API behavior and core logic and uses pytest 
 
 ## Documentation
 
-For questions or clarification, see the [documentation](https://github.com/teymuri-alireza/woninet/blob/main/docs/documentation.md).
+For questions or clarification, see the [documentation](https://github.com/woninet/woninet/blob/main/docs/documentation.md).
 
 ## Contributing
 
-Thank you for considering a contribution to Woninet. To help maintain code quality, stability, and a predictable release process, please review the [Contributing Guide](https://github.com/teymuri-alireza/woninet/blob/main/CONTRIBUTING.md) before submitting changes.
+Thank you for considering a contribution to Woninet. To help maintain code quality, stability, and a predictable release process, please review the [Contributing Guide](https://github.com/woninet/woninet/blob/main/CONTRIBUTING.md) before submitting changes.
 
 ## License
 

@@ -4,6 +4,50 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [2.3.0] - 2026-11-20
+
+### Added
+
+- Implemented methods to delete stale availability records from the database after every scan cycle.
+- Added `get_device` method to fetch the device object for the provided IP address.
+- Added `psycopg[binary]` and `pydantic-settings` to dependencies to manage the PostgreSQL database and dotenv variables.
+- Implemented PostgreSQL support alongside SQLite.
+- Implemented environment-based settings via `pydantic-settings`.
+- Added custom exception `DatabaseConnectionFailed`, raised when the database cannot be reached during initialization.
+- Added the `env_file` field to the Docker `compose.yaml` and set the required field to false, to use config.json as fallback.
+- Added favicon for the web dashboard.
+- Implemented `DiagnosticManager` to preserve, collect, and display issues to users in the dashboard UI.
+- Added `/health` and `/api/health/restart` endpoints to report issues and handle the application restart workflow.
+- Added a custom HTTP `503 Service Unavailable` error to indicate monitoring failures.
+
+### Changed
+
+- Optimized device filtering by using API query parameters, eliminating the need to call `get_device_history()` in the `device_info` JavaScript.
+- Updated `httpx` dependency to `httpx2` to resolve `StarletteDeprecationWarning` in tests.
+- Enhanced the result counter in the alerts page to show starting and ending indexes.
+- Updated the database schema in `config.json` to contain `type` and `path` keys.
+- `NetworkMonitorCore` and `create_monitor` now accept `database_config` instead of `database_path`.
+- The availability upsert now uses the SQLite or PostgreSQL `insert` construct according to the configured database type.
+- Implemented `MonitorManager` to centralize application workflow control previously handled by `NetworkMonitorCore`.
+
+### Removed
+
+- Removed the redundant charts mount and directory from server.
+
+### Deprecated
+
+- Marked the CLI interface as deprecated in the output of `woninet --help`, `usage.md` documentation, and CLI mode.
+
+### Fixed
+
+- Prevented /24 subnet enumeration when target IP addresses are empty to stop redundant full scans.
+- Prevented scan cycle and database activites when candidate_devices are empty.
+- Passed `total_events` value to alerts page to display the total number of alert events.
+- Disabled both pagination buttons when the `totalPages` value is set to one.
+- Used `str(d)` to resolve TypeError in PostgreSQL databases.
+
+---
+
 ## [2.2.0] - 2026-10-30
 
 ### Added

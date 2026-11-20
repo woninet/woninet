@@ -19,7 +19,7 @@ This ensures the monitor only proceeds when the system has an active interface.
 
 ## 2. Initializing the Monitoring Core
 
-An instance of NetworkMonitorCore is created.
+An instance of `NetworkMonitorCore` is created using `MonitorManager`, either by the server or the CLI interface, depending on the running mode.
 
 The core receives:
 
@@ -41,25 +41,20 @@ The core is responsible for orchestrating:
 
 It is the central controller of the system.
 
-## 3. Subnet Enumeration (/24 Range)
+## 3. IP address Enumeration
 
-Woninet uses the SubnetEnumerator class to generate a dictionary of candidate devices 
-using the user-provided target IP address or all the IP addresses within the local `/24` subnet.
-
-For a source IP such as:
-
-```text
-192.168.1.23
-```
-
-It builds the full CIDR block:
+Woninet uses the `ManualIPEnumerator` class to generate a dictionary of candidate devices 
+from the user-provided list of IP addresses and ranges. The list can contain single IP
+addresses or ranges. For example:
 
 ```text
-192.168.1.1 - 192.168.1.254
+192.168.1.1, 192.168.1.100-200
 ```
 
-This step doesn't determine if devices exist or respond — it only constructs the list of
-potential addresses.
+An empty list indicates that no scan cycle will run.
+
+Enumeration only constructs the list of potential devices and does not
+determine whether devices exist or respond.
 
 The output is a dictionary:
 
@@ -67,7 +62,8 @@ The output is a dictionary:
 { "192.168.1.1": Device(...), "192.168.1.2": Device(...), ... }
 ```
 
-Every IP in the `/24` block is represented as a Device model with initial default values.
+Every IP address in the configured list is represented as a Device model with initial
+default values.
 
 ## 4. ARP + ICMP Host Detection
 
@@ -197,10 +193,8 @@ a state change.
 
 ## 7. Looping and Scheduling
 
-Looping behavior depends on the execution mode:
+Looping behavior depends on the execution mode. The `MonitorManager` is responsible for managing the lifecycle and execution of the network monitoring core.
 
-In **CLI interface**, the main loop is implemented in `engine.py`, where the monitoring
-cycle runs continuously.
+In the **CLI interface**, `MonitorManager` is initialized within the `main()` function to start and manage the network monitoring core. The monitoring cycle runs continuously until the process is interrupted or stopped.
 
-In the **web-based dashboard**, the looping logic is coordinated through FastAPI in `app.py` (backend)
-and periodic updates handled by `app.js` on the frontend.
+In the **web-based dashboard**, `MonitorManager` is initialized during the FastAPI application lifespan. It manages the network monitoring core independently of the web server, while periodic updates are handled by `app.js` on the frontend.

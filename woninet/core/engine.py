@@ -1,5 +1,4 @@
 import json
-import time
 import logging
 import threading
 from datetime import date, datetime, timedelta, time as dt_time
@@ -12,6 +11,7 @@ from woninet.core.collectors import PingCollector
 from woninet.core.storage import StorageEngine
 from woninet.core.alerts import AlertEngine, AlertRule
 from woninet.core.subnet_enumerator import SubnetEnumerator
+from woninet.core.diagnostic import DiagnosticManager
 from woninet.core.manual_ip_enumerator import ManualIPEnumerator
 from woninet.database.engine import DatabaseEngine
 from woninet.database.tables import AlertEventTable
@@ -31,7 +31,7 @@ class NetworkMonitorCore:
 
     This class acts as the orchestrator for the network monitoring lifecycle,
     managing thread pools for asynchronous ICMP polling and interfacing with
-    the SQLite persistence layer via SQLAlchemy.
+    the database layer via SQLAlchemy.
 
     Attributes:
         local_ip (str): The source interface IP used for packet origination.
@@ -60,10 +60,11 @@ class NetworkMonitorCore:
         local_ip: str,
         target_ip: str,
         arp_noise_limit: float,
-        database_path: str,
+        database_config: dict[str, str],
         max_thread_workers: int,
         alert_rules: dict,
         config_file_path: str,
+        diagnostics: DiagnosticManager,
     ) -> None:
         """
         Initialize the monitor core and prepare the persistence layer.
@@ -73,39 +74,72 @@ class NetworkMonitorCore:
             target_ip (str): User-provided IP address or range to scan.
             arp_noise_limit (float): Threshold in milliseconds above which ARP
                 fluctuations are treated as noise.
-            database_path (str): Path to SQLite database.
+            database_config (dict[str, str]): The database configuration, including the
+                database type and path.
             max_thread_workers (int): Maximum number of thread workers used to send ICMP pings.
             alert_rules (dict): Provided alert rules, loaded from config.json.
             config_file_path (str): Path to the config file to load.
+            diagnostics (DiagnosticManager): Instance of DiagnosticManager to collect application's
+                issues.
         """
         self._running: bool = False
         self._thread: threading.Thread | None = None
         self._stop_event: threading.Event = threading.Event()
         self._start_uptime = datetime.now()
+        self._status: Literal["healthy", "degraded"] = "healthy"
         self.availability_retention_days: int = 90
         self._last_availability_prune: date | None = None
-
+        self.diagnostics = diagnostics
         self.local_ip: str = local_ip
-        self.default_gateway: str = self.set_default_gateway()
+
+        try:
+            self.default_gateway: str = self.set_default_gateway()
+        except Exception:
+            self.default_gateway = "--"
 
         self.arp_noise_limit: float = arp_noise_limit
         self.max_thread_workers: int = max_thread_workers
         self.config_file_path: str = config_file_path
+        self.database_type: str = database_config.get("type")
+        self.database_path: str = database_config.get("path")
 
-        # Initialize database
-        self.database_engine = DatabaseEngine(database_path=database_path)
-        self.database_engine.init_db()
-        self._engine = self.database_engine.get_database_engine()
-        self.session_factory = self.database_engine.get_session_factory()
+        try:
+            # Initialize database
+            self.database_engine = DatabaseEngine(
+                database_type=self.database_type,
+                database_path=self.database_path,
+                diagnostics=self.diagnostics,
+            )
+            self.database_engine.init_db()
+            self._engine = self.database_engine.get_database_engine()
+            self.session_factory = self.database_engine.get_session_factory()
+        except Exception:
+            self.diagnostics.add_issue(
+                component="monitor_core",
+                code="DATABASE_FAILED",
+                message="Database initialization failed",
+            )
+            self.set_status("degraded")
+            return
 
         core_logger.info(f"Initializing network monitor for {self.local_ip}")
 
         self.subnet_enumerator = SubnetEnumerator()
-        self.manual_ip_enumerator = ManualIPEnumerator()
+        self.manual_ip_enumerator = ManualIPEnumerator(self.diagnostics)
+
         self.storage = StorageEngine(session_factory=self.session_factory)
 
         self._validate_config_file_target_ip_type()
-        self.candidate_devices = self.enumerate_candidate_devices(target_ip)
+        try:
+            self.candidate_devices = self.enumerate_candidate_devices(target_ip)
+        except Exception:
+            self.diagnostics.add_issue(
+                component="monitor_core",
+                code="IP_ENUMERATION_FAILED",
+                message="Enumerating target IP address failed",
+            )
+            self.set_status("degraded")
+            return
 
         self.ping_collector = PingCollector()
 
@@ -168,65 +202,59 @@ class NetworkMonitorCore:
                 cycle_started = datetime.now()
                 cycle_checks: list[tuple[str, bool]] = []
 
-                for result in self.ping_collector.collect(
-                    candidate_devices=self.candidate_devices,
-                    local_ip=self.local_ip,
-                    device_records=self.get_device_history(),
-                    stop_event=self._stop_event,
-                    arp_noise_limit=self.arp_noise_limit,
-                    max_thread_workers=self.max_thread_workers,
-                ):
-                    try:
-                        self.submit_to_history(
-                            device=result.device,
-                            metrics=[result.latency, result.packet_loss, result.jitter],
-                        )
-                        if result.device is not None:
-                            cycle_checks.append(
-                                (result.device.ip, result.device.reachable)
-                            )
-                            self.alert_engine.evaluate(
-                                ip=result.device.ip,
-                                metrics_list=[
+                if self.candidate_devices != {} and self.is_healthy():
+                    for result in self.ping_collector.collect(
+                        candidate_devices=self.candidate_devices,
+                        local_ip=self.local_ip,
+                        device_records=self.get_device_history(),
+                        stop_event=self._stop_event,
+                        arp_noise_limit=self.arp_noise_limit,
+                        max_thread_workers=self.max_thread_workers,
+                    ):
+                        try:
+                            self.submit_to_history(
+                                device=result.device,
+                                metrics=[
                                     result.latency,
                                     result.packet_loss,
                                     result.jitter,
                                 ],
-                                default_consecutive_checks={
-                                    "latency": self.consecutive_checks["latency"],
-                                    "packet_loss": self.consecutive_checks[
-                                        "packet_loss"
-                                    ],
-                                    "jitter": self.consecutive_checks["jitter"],
-                                },
                             )
-                    except AttributeError:
-                        # If the tuple doesn't have enough values to unpack
-                        pass
-                self.record_availability(cycle_checks, cycle_started)
-                self.prune_availability()
-                self.delete_stale_devices()
-                self.delete_stale_alert_states()
-                time.sleep(1)
+                            if result.device is not None:
+                                cycle_checks.append(
+                                    (result.device.ip, result.device.reachable)
+                                )
+                                self.alert_engine.evaluate(
+                                    ip=result.device.ip,
+                                    metrics_list=[
+                                        result.latency,
+                                        result.packet_loss,
+                                        result.jitter,
+                                    ],
+                                    default_consecutive_checks={
+                                        "latency": self.consecutive_checks["latency"],
+                                        "packet_loss": self.consecutive_checks[
+                                            "packet_loss"
+                                        ],
+                                        "jitter": self.consecutive_checks["jitter"],
+                                    },
+                                )
+                        except AttributeError:
+                            # If the tuple doesn't have enough values to unpack
+                            pass
+                    self.record_availability(cycle_checks, cycle_started)
+                    self.clean_up_database()
+                self._stop_event.wait(1)
         except (PermissionError, SocketPermissionError):
             core_logger.error("woninet requires root privileges to scan.")
-            self._running = False
-            self._stop_event.set()
         except SocketAddressError:
             core_logger.error("Network connection failed. Quitting.")
-            self._running = False
-            self._stop_event.set()
         except PingUtilityNotFound:
             core_logger.error("Couldn't find the ping command on PATH. Quitting.")
-            self._running = False
-            self._stop_event.set()
         except Exception as e:
             core_logger.error(f"Unexpected error in NetworkMonitorCore: {e}")
-            self._running = False
-            self._stop_event.set()
         finally:
-            self._running = False
-            self._stop_event.set()
+            self.set_status("degraded")
 
     def is_alive(self) -> bool:
         """
@@ -234,11 +262,42 @@ class NetworkMonitorCore:
         """
         return self._running
 
+    def is_healthy(self) -> bool:
+        """
+        Return the monitor status (`healthy`, `degraded`).
+        """
+        return self._status == "healthy"
+
+    def set_status(self, status: Literal["healthy", "degraded"]) -> None:
+        """
+        Set the monitor status (`healthy`, `degraded`).
+
+        Args:
+            status: The monitor's current status
+
+        Raises:
+            ValueError: When the given status is not accepted (
+                `healthy`, `degraded`).
+        """
+        if status not in ["healthy", "degraded"]:
+            raise ValueError("Status value can be `healthy` or `degraded`.")
+
+        self._status = status
+
     def get_device_history(self) -> list[Device]:
         """
         Return a list of all devices in the history.
         """
         return self.storage.list_device_history()
+
+    def get_device(self, ip: str) -> Device | None:
+        """
+        Return a device for the given IP address or None if not found.
+
+        Args:
+            The IP address of device to look for.
+        """
+        return self.storage.fetch_device_info(ip=ip)
 
     def record_availability(
         self, checks: list[tuple[str, bool]], when: datetime
@@ -257,7 +316,9 @@ class NetworkMonitorCore:
             return
 
         hour_start = when.replace(minute=0, second=0, microsecond=0)
-        self.storage.record_availability(checks=checks, hour_start=hour_start)
+        self.storage.record_availability(
+            checks=checks, hour_start=hour_start, database_type=self.database_type
+        )
 
     def get_availability(
         self,
@@ -348,6 +409,20 @@ class NetworkMonitorCore:
             if device.latency == 0 and device.mac is None:
                 self.storage.delete_device(device=device)
 
+    def delete_stale_availability(self) -> None:
+        """
+        Remove stable availability records from storage.
+
+        Availability records that are not found in the devices history are treated
+        as stable.
+        """
+        ip_records = [device.ip for device in self.get_device_history()]
+        availability_records = self.storage.list_availability()
+
+        for record in availability_records:
+            if record.device_ip not in ip_records:
+                self.storage.delete_availability(record=record)
+
     def delete_stale_alert_states(self) -> None:
         """
         Remove stale alert states from storage.
@@ -361,6 +436,16 @@ class NetworkMonitorCore:
         for record in alert_state_records:
             if record.device_ip not in ip_records:
                 self.storage.delete_alert_state(state=record)
+
+    def clean_up_database(self) -> None:
+        """
+        Control methods responsible for deleting stale records for
+        keeping the database clean.
+        """
+        self.prune_availability()
+        self.delete_stale_devices()
+        self.delete_stale_availability()
+        self.delete_stale_alert_states()
 
     def get_device_info(
         self, ip: str
@@ -441,8 +526,8 @@ class NetworkMonitorCore:
     ) -> dict[str, Device]:
         """
         Control enumeration based on user-provided IP addresses. Use range enumeration
-        if IP range is detected, otherwise use the single IP address. Enumerate on the
-        /24 subnet if no target IP address is provided.
+        if IP range is detected, otherwise use the single IP address. An empty list
+        indicates no enumeration.
 
         Args:
             target_ip (list[str]|None): Target IP addresses to create candidate devices on.
@@ -463,8 +548,14 @@ class NetworkMonitorCore:
                 else:
                     candidate_devices[target_ip] = Device(ip=target_ip)
         else:
-            candidate_devices.update(self.subnet_enumerator.enumerate(self.local_ip))
+            candidate_devices = {}
+
         if not is_device_ip_valid(candidate_devices):
+            self.diagnostics.add_issue(
+                component="configuration",
+                code="INVALID_IP_ADDRESS",
+                message="Provided target IP address in `config.json` is not valid.",
+            )
             raise ValueError("IP address is not valid")
         return candidate_devices
 
@@ -595,4 +686,4 @@ class NetworkMonitorCore:
         A wrapper to set the default gateway using the `get_default_gateway()`
         utility.
         """
-        return get_default_gateway()
+        return get_default_gateway(self.diagnostics)

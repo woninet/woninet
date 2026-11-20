@@ -1,6 +1,7 @@
 from datetime import date, datetime
 from sqlalchemy import func, select
-from sqlalchemy.dialects.sqlite import insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.orm import Session
 from woninet.database.tables import AvailabilityTable
 
@@ -23,8 +24,14 @@ class AvailabilityRepository:
         """
         self.session: Session = session
 
+    def fetch_all(self) -> list[AvailabilityTable]:
+        """
+        Return a list device's availability records form the database.
+        """
+        return self.session.query(AvailabilityTable).all()
+
     def record_checks(
-        self, checks: list[tuple[str, bool]], hour_start: datetime
+        self, checks: list[tuple[str, bool]], hour_start: datetime, database_type: str
     ) -> None:
         """
         Add one check per device to the counters of the given hour (atomic upsert).
@@ -42,7 +49,11 @@ class AvailabilityRepository:
             for ip, reachable in checks
         ]
 
-        stmt = insert(AvailabilityTable)
+        stmt = (
+            sqlite_insert(AvailabilityTable)
+            if database_type.lower() == "sqlite"
+            else postgresql_insert(AvailabilityTable)
+        )
         stmt = stmt.on_conflict_do_update(
             index_elements=["device_ip", "hour_start"],
             set_={
@@ -74,7 +85,7 @@ class AvailabilityRepository:
             .group_by(day)
         )
         return {
-            date.fromisoformat(d): (int(checks), int(up_checks))
+            date.fromisoformat(str(d)): (int(checks), int(up_checks))
             for d, checks, up_checks in self.session.execute(stmt)
         }
 
@@ -111,3 +122,14 @@ class AvailabilityRepository:
             .filter(AvailabilityTable.hour_start < cutoff)
             .delete(synchronize_session=False)
         )
+
+    def delete(self, record: AvailabilityTable) -> None:
+        """
+        Delete a availability record from the database.
+
+        Args:
+            record: AvailabilityTable instance to be removed.
+        """
+        self.session.query(AvailabilityTable).filter_by(
+            device_ip=record.device_ip,
+        ).delete(synchronize_session=False)

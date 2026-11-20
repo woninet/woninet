@@ -1,16 +1,27 @@
 from typing import Literal
 from ipaddress import IPv4Address
-from fastapi import APIRouter, HTTPException, Path, Query, Request, status
+from fastapi import APIRouter, HTTPException, Path, Query, Request, Depends, status
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
-from woninet.server.dependencies import get_monitor_gracefully
+from woninet.server.dependencies import require_monitor
 
 router = APIRouter(prefix="/api/devices", tags=["devices"])
 
 
 @router.get("")
-def list_devices(request: Request):
-    monitor = get_monitor_gracefully()
+def list_devices(
+    request: Request,
+    ip: str = Query(None),
+    monitor=Depends(require_monitor),
+):
+    if ip is not None:
+        return JSONResponse(
+            content={
+                "device": jsonable_encoder(monitor.get_device(ip=ip)),
+            },
+            status_code=status.HTTP_200_OK,
+        )
+
     return JSONResponse(
         content={
             "devices": jsonable_encoder(monitor.get_device_history()),
@@ -27,6 +38,7 @@ def device_availability(
     ),
     days: int = Query(default=90, ge=1, le=365),
     granularity: Literal["day", "hour"] = Query(default="day"),
+    monitor=Depends(require_monitor),
 ):
     if granularity == "hour" and days > 7:
         raise HTTPException(
@@ -34,7 +46,6 @@ def device_availability(
             detail="Hourly granularity supports at most 7 days.",
         )
 
-    monitor = get_monitor_gracefully()
     ip = str(ip)
 
     if not monitor.device_exists(ip=ip):

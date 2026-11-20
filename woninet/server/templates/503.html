@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>503 | woninet</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/404.css">
+    <link rel="stylesheet" href="/static/css/503.css">
+    <link rel="shortcut icon" href="/static/img/favicon.ico" type="image/x-icon">
+</head>
+
+<body>
+
+<div class="card">
+
+    <div class="network-icon">
+
+        <i class="fa-solid fa-server"></i>
+
+    </div>
+
+    <h1>503</h1>
+
+    <h2>Service Unavailable</h2>
+
+    <p>
+
+        The monitoring service is unable to handle
+        your request. One of its core components, such as the
+        monitor engine, the database, or the configuration, may
+        be failing or still starting up.
+
+    </p>
+
+    <div class="status">
+
+        <span class="status-dot warning"></span>
+
+        Service unavailable
+
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- HEALTH ENDPOINT HINT -->
+    <div class="health-hint">
+
+        <p class="health-hint-title">
+
+            <i class="fa-solid fa-stethoscope"></i>
+
+            To check the issue, go to the health endpoint
+
+        </p>
+
+        <div class="health-hint-row">
+
+            <span class="health-hint-label">Endpoint</span>
+
+            <a href="/health" class="health-hint-link">
+
+                <code>/health</code>
+
+            </a>
+
+        </div>
+
+        <p class="health-hint-note">
+
+            The health page shows the status of each component
+            along with the error code and message for any
+            component that has failed.
+
+        </p>
+
+    </div>
+
+    <div class="actions">
+
+        <a href="/health" class="btn btn-primary">
+
+            <i class="fa-solid fa-heart-pulse"></i>
+
+            Open Health Page
+
+        </a>
+
+        <a href="javascript:location.reload()" class="btn btn-secondary">
+
+            <i class="fa-solid fa-rotate-right"></i>
+
+            Try Again
+
+        </a>
+
+    </div>
+
+    <div class="footer">
+
+        woninet • Network Monitoring Dashboard
+
+    </div>
+
+</div>
+
+</body>
+
+</html>

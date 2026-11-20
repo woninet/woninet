@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
     <link rel="stylesheet" href="/static/css/style.css">
     <link rel="stylesheet" href="/static/css/about.css">
+    <link rel="shortcut icon" href="/static/img/favicon.ico" type="image/x-icon">
 </head>
 <body>
     <div class="app">
@@ -28,6 +29,10 @@
                 <a class="nav-link" href="/alerts">
                     <i class="fa-solid fa-bell"></i>
                     <span>Alerts</span>
+                </a>
+                <a class="nav-link" href="/health">
+                    <i class="fa-solid fa-heart-pulse"></i>
+                    <span>Health</span>
                 </a>
                 <a class="nav-link" href="/settings">
                     <i class="fa-solid fa-gear"></i>
@@ -64,6 +69,15 @@
                     <div class="info-row">
                         <dt>Version</dt>
                         <dd><span class="version-badge">v{{ version }}</span></dd>
+                    </div>
+                    <div class="info-row">
+                        <dt>Website</dt>
+                        <dd>
+                            <a class="text-link" href="{{ website }}" target="_blank" rel="noopener noreferrer">
+                                <i class="fa fa-globe"></i>
+                                <span>{{ website }}</span>
+                            </a>
+                        </dd>
                     </div>
                     <div class="info-row">
                         <dt>Source Code</dt>

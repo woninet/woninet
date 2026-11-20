@@ -9,7 +9,7 @@ Whether you're fixing a bug, improving the documentation, or implementing a new 
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/teymuri-alireza/woninet
+git clone https://github.com/woninet/woninet
 cd woninet
 ```
 

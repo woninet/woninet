@@ -14,7 +14,7 @@ woninet
 
 This way you can serve Woninet dashboard on port 8080. In this mode, core logging is set to ERROR to reduce unnecessary output
 
-## CLI mode
+## CLI mode (deprecated)
 
 You can run Woninet in CLI mode with:
 
@@ -116,10 +116,13 @@ may no longer correctly correlate with the new network topology.
 to a different network to ensure data integrity. You can do this using:
 
 ```json
-"database": "path_to_new_database"
+"database": {
+    "type": "Current database type",
+    "path":"path_to_new_database"
+}
 ```
 
-**Note:** The `database` value can be changed from the `config.json` file or the settings page form the web dashboard. Check the `Configuration` section in `README.md`.
+**Note:** The `database` value can be changed from the `config.json` file. Check the `Configuration` section in `README.md`.
 
 ### Accessing a Specific Database
 
@@ -137,4 +140,4 @@ woninet -p 9090
 ---
 
 If you encounter additional issues, feel free to open an issue on the
-[woninet](https://github.com/teymuri-alireza/woninet) GitHub repository.
+[woninet](https://github.com/woninet/woninet) GitHub repository.

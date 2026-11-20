@@ -1,0 +1,230 @@
+/* Health page — extends style.css */
+
+/* ---------- Header actions ---------- */
+.health-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.last-checked {
+    color: var(--muted);
+    font-size: .85rem;
+}
+
+.refresh-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    background: #fff;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: .875rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+    transition: background .15s, border-color .15s, color .15s;
+    margin: 4px 0 4px 0;
+}
+
+.refresh-btn:hover:not(:disabled) {
+    background: #f1f5fd;
+    border-color: #bfdbfe;
+    color: var(--accent);
+}
+
+.refresh-btn:disabled {
+    opacity: .6;
+    cursor: not-allowed;
+}
+
+.refresh-btn.loading i {
+    animation: spin 1s linear infinite;
+}
+
+/* ---------- Overall status banner ---------- */
+.overall {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 20px 24px;
+    margin-bottom: 24px;
+    border: 1px solid var(--border);
+    border-left: 5px solid var(--muted);
+    border-radius: 14px;
+    background: var(--panel);
+    box-shadow: var(--shadow);
+}
+
+.overall h2 {
+    margin: 0 0 4px;
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.overall p {
+    margin: 0;
+    color: var(--muted);
+    font-size: .9rem;
+}
+
+.overall-icon {
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    font-size: 1.2rem;
+    background: #eef2f7;
+    color: var(--muted);
+}
+
+.overall.healthy  { border-left-color: var(--good); }
+.overall.failed   { border-left-color: var(--bad); }
+
+.overall.healthy  .overall-icon { background: #dcfce7; color: var(--good); }
+.overall.failed   .overall-icon { background: #fee2e2; color: var(--bad); }
+
+/* ---------- Component cards ---------- */
+.health-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+}
+
+.health-card {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 22px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-top: 4px solid var(--muted);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+}
+
+.health-card.healthy  { border-top-color: var(--good); }
+.health-card.failed   { border-top-color: var(--bad); }
+
+.health-card-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.health-card-icon {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    font-size: 1.05rem;
+    background: #eef2f7;
+    color: var(--muted);
+}
+
+.health-card.healthy  .health-card-icon { background: #dcfce7; color: var(--good); }
+.health-card.failed   .health-card-icon { background: #fee2e2; color: var(--bad); }
+
+.health-card-title {
+    flex: 1;
+    min-width: 0;
+}
+
+.health-card-title h3 {
+    margin: 0 0 6px;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.health-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 11px;
+    border-radius: 999px;
+    font-size: .7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    background: #eef2f7;
+    color: var(--muted);
+}
+
+.health-badge::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.health-badge.healthy  { background: #dcfce7; color: var(--good); }
+.health-badge.failed   { background: #fee2e2; color: var(--bad); }
+
+/* ---------- Error details ---------- */
+.health-ok {
+    margin: 0;
+    color: var(--muted);
+    font-size: .875rem;
+}
+
+.error-details {
+    margin: 0;
+    padding: 14px 16px;
+    border-radius: 10px;
+    background: var(--panel-light);
+    border: 1px solid var(--border);
+}
+
+.health-card.failed .error-details {
+    background: #fef2f2;
+    border-color: #fecaca;
+}
+
+.error-row + .error-row {
+    margin-top: 10px;
+}
+
+.error-details dt {
+    margin-bottom: 3px;
+    color: var(--muted);
+    font-size: .7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+}
+
+.error-details dd {
+    margin: 0;
+    font-size: .875rem;
+    line-height: 1.5;
+    word-break: break-word;
+}
+
+.error-code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-weight: 600;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1100px) {
+    .health-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 800px) {
+    .health-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+}

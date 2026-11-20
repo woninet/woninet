@@ -1,13 +1,12 @@
-from fastapi import APIRouter, status, Request, Form
+from fastapi import APIRouter, status, Request, Form, Depends
 from fastapi.responses import JSONResponse
-from woninet.server.dependencies import get_monitor_gracefully
+from woninet.server.dependencies import require_monitor
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 
 @router.get("")
-def settings():
-    monitor = get_monitor_gracefully()
+def settings(monitor=Depends(require_monitor)):
     data = monitor.load_config_json()
 
     return JSONResponse(
@@ -28,9 +27,8 @@ def update_settings(
     max_workers=Form(None),
     arp_noise_limit=Form(None),
     target_ip_list=Form(None),
+    monitor=Depends(require_monitor),
 ):
-    monitor = get_monitor_gracefully()
-
     monitor.update_configuration(
         max_workers=max_workers,
         arp_noise_limit=arp_noise_limit,

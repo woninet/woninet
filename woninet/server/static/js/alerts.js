@@ -1,4 +1,5 @@
 let allAlerts = [];
+let totalEvents = 0;
 let currentPage = 1;
 let totalPages = 0;
 const pageSize = 10;
@@ -47,8 +48,15 @@ function renderAlerts() {
         return matchesIp && matchesType;
     });
 
+    resultStart = (currentPage * 10) - 9;
+    if (currentPage * 10 > totalEvents) {
+        resultEnd = totalEvents;
+    } else {
+        resultEnd = currentPage * 10;
+    }
+
     document.getElementById("alert_count").textContent =
-        `Showing ${filtered.length} of ${allAlerts.length} events`;
+        `Showing ${resultStart} - ${resultEnd} of ${totalEvents} events`;
 
     document.getElementById("alerts").innerHTML = filtered.length
         ? filtered.map(createAlertCard).join("")
@@ -58,6 +66,12 @@ function renderAlerts() {
 function PaginationBtnHandler() {
     document.getElementById("previous-page").disabled = false;
     document.getElementById("next-page").disabled = false;
+
+    if (totalPages === 1) {
+        document.getElementById("previous-page").disabled = true;
+        document.getElementById("next-page").disabled = true;
+        return;
+    }
 
     if (currentPage === 1) {
         document.getElementById("previous-page").disabled = true;
@@ -89,6 +103,7 @@ async function loadAlerts(page = currentPage) {
 
         currentPage = data.page_details.page;
         totalPages = data.page_details.total_pages;
+        totalEvents = data.total_events;
 
         document.getElementById("current-page").textContent = currentPage;
 
