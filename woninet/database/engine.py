@@ -59,10 +59,11 @@ class DatabaseEngine:
             self.diagnostics.add_issue(
                 component="configuration",
                 code="WRONG_CONFIG_KEY",
-                message="The provided `database_type` in the `config.json` is not valid. Use either `sqlite` or `postgresql`.",
+                message="Invalid database type in `config.json`. Expected `sqlite` or `postgresql`.",
+                docs_url="https://github.com/woninet/woninet#configuration",
             )
             raise ValueError(
-                "The provided `database_type` in the `config.json` is not valid. Use either `sqlite` or `postgresql`."
+                "Invalid database type in `config.json`. Expected `sqlite` or `postgresql`."
             )
 
         self.SessionLocal = sessionmaker(bind=self.engine, autoflush=False)
@@ -114,6 +115,7 @@ class DatabaseEngine:
                 component="configuration",
                 code="CONFIG_KEY_MISSING",
                 message="Missing required key 'type' under 'database' in 'config.json'.",
+                docs_url="https://github.com/woninet/woninet#configuration",
             )
             raise KeyError(
                 "Missing required key 'type' under 'database' in 'config.json'."
@@ -130,6 +132,7 @@ class DatabaseEngine:
                     component="configuration",
                     code="CONFIG_KEY_MISSING",
                     message="The database URL or path is not defined.",
+                    docs_url="https://github.com/woninet/woninet#configuration",
                 )
                 raise ValueError("The database URL or path is not defined.")
 
@@ -149,5 +152,6 @@ class DatabaseEngine:
                 component="configuration",
                 code="CONFIG_KEY_MISSING",
                 message="The database URL or path is not defined.",
+                docs_url="https://github.com/woninet/woninet#configuration",
             )
             raise ValueError("The database URL or path is not defined.")

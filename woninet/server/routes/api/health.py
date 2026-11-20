@@ -30,6 +30,7 @@ def health():
                 "configuration": {
                     "error_code": configuration.get("code"),
                     "message": configuration.get("message"),
+                    "docs_url": configuration.get("docs_url"),
                 },
                 "utility": {
                     "error_code": utility.get("code"),

@@ -1,4 +1,4 @@
-from typing import TypedDict
+from typing import TypedDict, Optional
 from uuid import uuid4
 
 
@@ -10,11 +10,13 @@ class DiagnosticIssue(TypedDict):
         id: Unique identifier for the issue.
         code: Short code describing the issue type.
         message: Human-readable description of the issue.
+        docs_url: The documentation guide, if any.
     """
 
     id: str
     code: str
     message: str
+    docs_url: Optional[str]
 
 
 class DiagnosticManager:
@@ -31,7 +33,9 @@ class DiagnosticManager:
         """
         self.issues: dict[str, DiagnosticIssue] = {}
 
-    def add_issue(self, component: str, code: str, message: str) -> None:
+    def add_issue(
+        self, component: str, code: str, message: str, docs_url: Optional[str] = None
+    ) -> None:
         """
         Register a new diagnostic issue.
 
@@ -39,11 +43,13 @@ class DiagnosticManager:
             component: Name of the component associated with the issue.
             code: Short code describing the issue type.
             message: Human-readable explanation of the issue.
+            docs_url: The documentation guide, if required.
         """
         self.issues[component] = {
             "id": self._generate_id(),
             "code": code,
             "message": message,
+            "docs_url": docs_url,
         }
 
     def remove_issue(self, component: str) -> None:

@@ -72,9 +72,10 @@ function parseEntry(entry) {
 
     const code = entry.error_code;
     const message = entry.message;
+    const docs_url = entry.docs_url;
     const status = hasValue(code) || hasValue(message) ? "failed" : "healthy";
 
-    return { status, code: hasValue(code) ? code : "", message: hasValue(message) ? message : "" };
+    return { status, code: hasValue(code) ? code : "", message: hasValue(message) ? message : "" , docs_url: hasValue(docs_url) ? docs_url : ""};
 }
 
 function worstStatus(statuses) {
@@ -88,8 +89,12 @@ function worstStatus(statuses) {
 // Rendering
 // ---------------------------------------------------------------------------
 function createCard(component, result) {
-    const { status, code, message } = result;
+    const { status, code, message, docs_url } = result;
 
+    let docs_helper = null;
+    if (docs_url) {
+        docs_helper = "For more information, see:";
+    }
     let body;
 
     if (status === "failed") {
@@ -102,6 +107,8 @@ function createCard(component, result) {
             <div class="error-row">
                 <dt>Message</dt>
                 <dd>${escapeHtml(message || "No message provided.")}</dd>
+                <p>${docs_helper || ""}</p>
+                <a href='${docs_url}' target="_blank" rel="noopener noreferrer">${escapeHtml(docs_url || null)}</a>
             </div>
         </dl>`;
     } else if (status === "healthy") {
@@ -153,7 +160,7 @@ function renderHealth(data) {
 
 function renderUnreachable() {
     document.getElementById("health_cards").innerHTML = COMPONENTS
-        .map(component => createCard(component, { status: "unknown", code: "", message: "" }))
+        .map(component => createCard(component, { status: "unknown", code: "", message: "" , docs_url: ""}))
         .join("");
 
     renderOverall("unknown");
