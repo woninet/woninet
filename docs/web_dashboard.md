@@ -150,7 +150,8 @@ This endpoint uses the application's diagnostic information to report initializa
     },
     "configuration": {
       "error_code": "CONFIG_KEY_MISSING",
-      "message": "Missing required key 'type' under 'database' in 'config.json'."
+      "message": "Missing required key 'type' under 'database' in 'config.json'.",
+      "docs_url": "https://github.com/woninet/woninet#configuration"
     },
     "utility": {
       "error_code": null,
