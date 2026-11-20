@@ -1,5 +1,4 @@
 import asyncio
-from pathlib import Path
 from fastapi import FastAPI, Request, HTTPException, Depends, status
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
