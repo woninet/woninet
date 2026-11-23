@@ -111,16 +111,28 @@ Releases are prepared using release branches and merged into **main**.
 
 ## Commit Messages
 
-Write concise commit messages in the imperative mood.
+Write clear, concise commit messages that describe the changes introduced by the commit.
+
+We recommend using the imperative mood for the subject line. If additional context is needed, include a body explaining what changed and why.
 
 Examples:
 
+```text
+Add optional documentation URL to diagnostic issues
 ```
-Add alert persistence
-Fix ARP timeout handling
+
+```text
+Prevent server shutdown during monitor restart
+
+Use synchronization in MonitorManager to prevent race
+conditions between the watchdog and monitor restart.
+```
+
+```text
 Refactor database session management
-Update documentation
 ```
+
+There is no required commit message format. Conventional Commits is welcome, but contributors are free to use another style as long as messages remain clear and descriptive.
 
 ## Pull Requests
 
